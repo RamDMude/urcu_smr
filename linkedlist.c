@@ -1,5 +1,11 @@
 #include "linkedlist.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <urcu/urcu-qsbr.h> // For RCU QSBR
 
+// Helper function for freeing a node with RCU
+static void free_node_rcu(struct rcu_head *rcu) {
+    Node *node = caa_container_of(rcu, Node, rcu_head);
     free(node);
 }
 

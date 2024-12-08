@@ -71,3 +71,14 @@ int dequeue(Queue *queue, uint64_t *value) {
 
     return 0;
 }
+
+int queue_contains(Queue* queue, uint64_t value) {
+    QueueNode *head = queue->head;
+    while (head != NULL) {
+        if (head->value == value) {
+            return 1; // Value found in the queue
+        }
+        head = head->next;
+    }
+    return 0; // Value not found
+}
