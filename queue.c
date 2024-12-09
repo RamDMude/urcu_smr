@@ -7,6 +7,7 @@
 static void free_queue_node_rcu(struct rcu_head *rcu) {
     QueueNode *node = caa_container_of(rcu, QueueNode, rcu_head);
     free(node);
+    printf("Freed a node");
 }
 
 // Initialize queue
@@ -44,41 +45,46 @@ int enqueue(Queue *queue, uint64_t value) {
     new_node->value = value;
     new_node->next = NULL;
 
-    urcu_qsbr_read_lock();
-    queue->tail->next = new_node;
-    queue->tail = new_node;
-    urcu_qsbr_read_unlock();
+    // queue->tail->next = new_node;
+    rcu_assign_pointer(queue->tail->next, new_node);
+    // queue->tail = new_node;
+    rcu_assign_pointer(queue->tail, new_node);
 
     return 0;
 }
 
 // Dequeue a value
 int dequeue(Queue *queue, uint64_t *value) {
-    urcu_qsbr_read_lock();
     QueueNode *head = queue->head;
     QueueNode *next = head->next;
 
     if (!next) { // Queue is empty
-        urcu_qsbr_read_unlock();
         return -1;
     }
 
     *value = next->value;
-    queue->head = next;
+    // queue->head = next;
+    rcu_assign_pointer(queue->head, next);
 
-    urcu_qsbr_call_rcu(&head->rcu_head, free_queue_node_rcu);
-    urcu_qsbr_read_unlock();
+    // urcu_qsbr_call_rcu(&head->rcu_head, free_queue_node_rcu);
+    printf("Entering delete sync");
+    urcu_qsbr_synchronize_rcu();
+    printf("Exiting  delete sync");
+    free_queue_node_rcu(&head->rcu_head);
 
     return 0;
 }
 
 int queue_contains(Queue* queue, uint64_t value) {
-    QueueNode *head = queue->head;
+    urcu_qsbr_read_lock();
+    QueueNode *head = rcu_dereference(queue->head);
     while (head != NULL) {
         if (head->value == value) {
             return 1; // Value found in the queue
         }
-        head = head->next;
+        head = rcu_dereference(head->next);
     }
+    urcu_qsbr_read_unlock();
+    // urcu_qsbr_quiescent_state();
     return 0; // Value not found
 }
