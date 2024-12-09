@@ -7,6 +7,7 @@
 static void free_node_rcu(struct rcu_head *rcu) {
     Node *node = caa_container_of(rcu, Node, rcu_head);
     free(node);
+    printf("Free is Called\n");
 }
 
 // Initialize linked list
@@ -31,14 +32,18 @@ void destroy_list(LinkedList *list) {
 int add_node(LinkedList *list, uint64_t value) {
     Node *new_node = (Node *)malloc(sizeof(Node));
     if (!new_node) return -1;
-
+    
     new_node->value = value;
-
-    urcu_qsbr_read_lock();
-    Node *old_head = list->head;
-    new_node->next = old_head;
-    list->head = new_node;
-    urcu_qsbr_read_unlock();
+    
+    //urcu_qsbr_read_lock();
+    //Node *old_head = list->head;
+    Node* old_head = rcu_dereference(list->head);
+    //new_node->next = old_head;
+    rcu_assign_pointer(new_node->next, old_head);
+    //list->head = new_node;
+    rcu_assign_pointer(list->head, new_node);
+    //urcu_qsbr_read_unlock();
+    //synchronize_rcu_qsbr();
 
     return 0;
 }
@@ -46,8 +51,9 @@ int add_node(LinkedList *list, uint64_t value) {
 // Delete a node from the list
 int delete_node(LinkedList *list, uint64_t value) {
     Node *prev = NULL;
-    urcu_qsbr_read_lock();
-    Node *curr = list->head;
+    // Node *curr = list->head;
+    //urcu_qsbr_read_lock();
+    Node *curr = rcu_dereference(list->head);
 
     while (curr) {
         if (curr->value == value) {
@@ -56,22 +62,24 @@ int delete_node(LinkedList *list, uint64_t value) {
             } else {
                 list->head = curr->next;
             }
-            urcu_qsbr_call_rcu(&curr->rcu_head, free_node_rcu);
-            urcu_qsbr_read_unlock();
+            //urcu_qsbr_call_rcu(&curr->rcu_head, free_node_rcu);
+            //urcu_qsbr_read_unlock();
+            urcu_qsbr_synchronize_rcu();
+            free_node_rcu(&curr->rcu_head);
+            
             return 0; // Success
         }
         prev = curr;
         curr = curr->next;
     }
-
-    urcu_qsbr_read_unlock();
+    //urcu_qsbr_read_unlock();
     return -1; // Not found
 }
 
 // Check if a value exists in the list
 int contains(LinkedList *list, uint64_t value) {
     urcu_qsbr_read_lock();
-    Node *curr = list->head;
+    Node *curr = rcu_dereference(list->head);
 
     while (curr) {
         if (curr->value == value) {
