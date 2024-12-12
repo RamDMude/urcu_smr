@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <sched.h>
 #include <urcu/urcu-qsbr.h> // For RCU QSBR
-
+#include <unistd.h>
 // Helper function for freeing a node with RCU
 static void free_node_rcu(struct rcu_head *rcu) {
     Node *node = caa_container_of(rcu, Node, rcu_head);
@@ -44,8 +44,7 @@ int add_node(LinkedList *list, uint64_t value) {
     //list->head = new_node;
     rcu_assign_pointer(list->head, new_node);
     //urcu_qsbr_read_unlock();
-    //synchronize_rcu_qsbr();
-
+    urcu_qsbr_call_rcu(&new_node->rcu_head, free_node_rcu);
     return 0;
 }
 
@@ -63,7 +62,7 @@ int delete_node(LinkedList *list, uint64_t value) {
             } else {
                 list->head = curr->next;
             }
-            //urcu_qsbr_call_rcu(&curr->rcu_head, free_node_rcu);
+            
             //urcu_qsbr_read_unlock();
             urcu_qsbr_synchronize_rcu();
             free_node_rcu(&curr->rcu_head);
@@ -74,7 +73,7 @@ int delete_node(LinkedList *list, uint64_t value) {
         curr = curr->next;
     }
     //urcu_qsbr_read_unlock();
-    urcu_qsbr_synchronize_rcu();
+    //urcu_qsbr_synchronize_rcu();
     return -1; // Not found
 }
 
@@ -86,12 +85,14 @@ int contains(LinkedList *list, uint64_t value) {
     while (curr) {
         if (curr->value == value) {
             //sched_yield();
+            usleep(100000 * 1000);
             urcu_qsbr_read_unlock();
             return 1; // Found
         }
         curr = curr->next;
     }
     //sched_yield();
+    usleep(100000 * 1000);
     urcu_qsbr_read_unlock();
     return 0; // Not found
 }
