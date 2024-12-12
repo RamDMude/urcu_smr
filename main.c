@@ -8,7 +8,7 @@
 #include <urcu/urcu-qsbr.h>
 #include <inttypes.h>
 
-#define THREAD_COUNT 16
+#define THREAD_COUNT 8
 
 void* thread_func(void *arg) {
 #ifdef USE_LINKED_LIST
@@ -21,9 +21,9 @@ void* thread_func(void *arg) {
     urcu_qsbr_register_thread();
 
     for (int i = 0; i < 1000; i++) {
-        printf("Entering quiescent state function %d\n", i);
+        // printf("Entering quiescent state function %d\n", i);
         urcu_qsbr_quiescent_state();
-        printf("Exiting quiescent state function %d\n", i);
+        // printf("Exiting quiescent state function %d\n", i);
         uint64_t value = rand() % 100;
 
         if (rand() % 100 < 80) { // 80% reads
@@ -32,12 +32,12 @@ void* thread_func(void *arg) {
                 printf("Value %" PRIu64 " found in linked list.\n", value);
             }
 #elif defined(USE_STACK)
-            if (stack_contains(stack, value)) {
+            if (top(stack, &value)) {
                 printf("Value %" PRIu64 " found in stack.\n", value);
             }
 #elif defined(USE_QUEUE)
-            if (queue_contains(queue, value)) {
-                // printf("Value %" PRIu64 " found in queue.\n", value);
+            if (peek(queue, &value)) {
+                printf("Value %" PRIu64 " found in queue.\n", value);
             }
 #endif
         } else { // 20% writes
@@ -50,7 +50,7 @@ void* thread_func(void *arg) {
                 printf("Pushed value %" PRIu64 " onto stack.\n", value);
 #elif defined(USE_QUEUE)
                 enqueue(queue, value);
-                // printf("Enqueued value %" PRIu64 " to queue.\n", value);
+                printf("Enqueued value %" PRIu64 " to queue.\n", value);
 #endif
             } else {
 #ifdef USE_LINKED_LIST
@@ -65,7 +65,7 @@ void* thread_func(void *arg) {
 #elif defined(USE_QUEUE)
                 uint64_t dequeued_value;
                 if (dequeue(queue, &dequeued_value) == 0) {
-                    // printf("Dequeued value %" PRIu64 " from queue.\n", dequeued_value);
+                    printf("Dequeued value %" PRIu64 " from queue.\n", dequeued_value);
                 }
 #endif
             }

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <urcu/urcu-qsbr.h>
+#include <unistd.h>
 
 // Helper function for freeing a node with RCU
 static void free_queue_node_rcu(struct rcu_head *rcu) {
@@ -75,16 +76,21 @@ int dequeue(Queue *queue, uint64_t *value) {
     return 0;
 }
 
-int queue_contains(Queue* queue, uint64_t value) {
-    urcu_qsbr_read_lock();
+int peek(Queue *queue, uint64_t* value) {
+    urcu_qsbr_read_lock(); 
+
     QueueNode *head = rcu_dereference(queue->head);
-    while (head != NULL) {
-        if (head->value == value) {
-            return 1; // Value found in the queue
-        }
-        head = rcu_dereference(head->next);
+    QueueNode *next = rcu_dereference(head->next);
+
+    if (next == NULL) { 
+        // usleep(10 *1000);
+        urcu_qsbr_read_unlock();
+        return -1; // Indicate the queue is empty
     }
-    urcu_qsbr_read_unlock();
-    // urcu_qsbr_quiescent_state();
-    return 0; // Value not found
+
+    *value = next->value; 
+    // usleep(10 *1000);
+    urcu_qsbr_read_unlock(); 
+
+    return 0; // Successfully retrieved the value
 }

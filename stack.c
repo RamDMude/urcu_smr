@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <urcu/urcu-qsbr.h>
+#include <unistd.h>
 
 // Helper function to free a stack node using RCU
 static void free_stack_node_rcu(struct rcu_head *rcu) {
@@ -34,47 +35,48 @@ int push(Stack *stack, uint64_t value) {
 
     new_node->value = value;
 
-    urcu_qsbr_read_lock();
     StackNode *old_top = stack->top;
     new_node->next = old_top;
-    stack->top = new_node;
-    urcu_qsbr_read_unlock();
+    // stack->top = new_node;
+    rcu_assign_pointer(stack->top, new_node);
 
     return 0;
 }
 
 // Pop an item from the stack
 int pop(Stack *stack, uint64_t *value) {
-    urcu_qsbr_read_lock();
     StackNode *old_top = stack->top;
 
     if (!old_top) {
-        urcu_qsbr_read_unlock();
         return -1; // Stack is empty
     }
 
-    stack->top = old_top->next;
+    // stack->top = old_top->next;
+    rcu_assign_pointer(stack->top, old_top->next);
     *value = old_top->value;
 
-    urcu_qsbr_call_rcu(&old_top->rcu_head, free_stack_node_rcu);
-    urcu_qsbr_read_unlock();
+    // urcu_qsbr_call_rcu(&old_top->rcu_head, free_stack_node_rcu);
+    printf("Entering delete sync");
+    urcu_qsbr_synchronize_rcu();
+    printf("Exiting  delete sync");
+    free_stack_node_rcu(&old_top->rcu_head);
 
     return 0;
 }
 
-// Check if a value exists in the stack
-int stack_contains(Stack *stack, uint64_t value) {
-    urcu_qsbr_read_lock();
-    StackNode *curr = stack->top;
+int top(Stack *stack, uint64_t *value) {
+    urcu_qsbr_read_lock(); 
 
-    while (curr) {
-        if (curr->value == value) {
-            urcu_qsbr_read_unlock();
-            return 1; // Found
-        }
-        curr = curr->next;
+    StackNode *curr = rcu_dereference(stack->top);
+    if (!curr) { 
+        usleep(10*1000);
+        urcu_qsbr_read_unlock();
+        return -1; 
     }
 
-    urcu_qsbr_read_unlock();
-    return 0; // Not found
+    *value = curr->value; 
+    usleep(10*1000);
+    urcu_qsbr_read_unlock(); 
+
+    return 0; 
 }

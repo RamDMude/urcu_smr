@@ -22,6 +22,6 @@ Stack* init_stack();
 void destroy_stack(Stack *stack);
 int push(Stack *stack, uint64_t value);
 int pop(Stack *stack, uint64_t *value);
-int stack_contains(Stack *stack, uint64_t value);
+int top(Stack *stack, uint64_t *value);
 
 #endif // STACK_H

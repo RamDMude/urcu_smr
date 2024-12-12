@@ -19,6 +19,6 @@ Queue* init_queue();
 void destroy_queue(Queue *queue);
 int enqueue(Queue *queue, uint64_t value);
 int dequeue(Queue *queue, uint64_t *value);
-int queue_contains(Queue* queue, uint64_t value);
+int peek(Queue *queue, uint64_t* value);
 
 #endif // QUEUE_H
